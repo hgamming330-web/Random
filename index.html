@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vòng Quay May Mắn</title>
+<style>
+:root{--bg:#fff7ed;--text:#3b1d0a;--muted:#8a6a55;--card:#ffffff;--line:#fed7aa;--accent:#ea580c;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#150d1f;--text:#f5eefc;--muted:#b9a5cf;--card:#211535;--line:#3a2658;--accent:#fb923c}}
+:root[data-theme="dark"]{--bg:#150d1f;--text:#f5eefc;--muted:#b9a5cf;--card:#211535;--line:#3a2658;--accent:#fb923c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+main{max-width:1400px;margin:0 auto;padding:0 12px 40px;text-align:center}
+h1{font-size:clamp(1.5rem,5vw,2.2rem);margin:6px 0 2px}
+.sub{color:var(--muted);margin:0 0 10px}
+.stage{min-height:100dvh;display:flex;align-items:center;justify-content:center}
+canvas#w{width:min(100%,1100px,108dvh);height:auto;display:block;margin:0 auto}
+.bar{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin:10px 0}
+button{font:inherit;cursor:pointer;border:0;border-radius:999px;padding:13px 34px;font-weight:800;font-size:1.15rem;color:#fff;background:linear-gradient(135deg,#ea580c,#f59e0b);box-shadow:0 6px 16px rgba(234,88,12,.35)}
+button.alt{background:transparent;color:var(--text);border:1px solid var(--line);box-shadow:none;font-size:.9rem;padding:8px 16px;font-weight:600}
+button:disabled{opacity:.55;cursor:not-allowed}
+label{color:var(--muted);font-size:.9rem;display:flex;gap:6px;align-items:center;cursor:pointer}
+#live{color:var(--muted);min-height:1.5em;font-size:1.3rem}
+#res{margin:10px auto;padding:14px;background:var(--card);border:2px solid var(--line);border-radius:18px;max-width:760px;min-height:120px;display:flex;flex-direction:column;justify-content:center}
+#res .l{color:var(--muted);font-size:1.1rem;letter-spacing:.1em;text-transform:uppercase}
+#res .n{font-size:clamp(3rem,12vw,6.5rem);font-weight:800;color:var(--accent)}
+#res .n.pop{animation:pop .6s ease}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+h2{font-size:1rem;margin:20px 0 8px}
+#hist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.tag{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:.85rem}
+canvas#cf{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+</style>
+</head>
+<body>
+<main>
+  <div class="stage"><canvas id="w" width="720" height="720"></canvas></div>
+    <div class="bar">
+    <label><input type="checkbox" id="rm"> Loại người đã trúng khỏi vòng quay</label>
+    <button class="alt" id="reset">♻️ Chơi lại từ đầu</button>
+  </div>
+  <div id="live"></div>
+  <div id="res"><div class="l" id="rl">Hãy bấm QUAY ở giữa vòng quay</div><div class="n" id="rn">?</div></div>
+  <h2>Lịch sử</h2>
+  <div id="hist"><span style="color:var(--muted)">Chưa có ai.</span></div>
+</main>
+<canvas id="cf"></canvas>
+<script>
+const ALL = ["Trần Văn An","Doãn Tùng Chi","Phan Thị Ngọc Dung","Võ Chí Dũng","Phạm Thụy Hữu Duyên","Trần Xuân Độ","Nguyễn Trà Minh Hạnh","Lê Tuấn Huy","Nguyễn Công Tường Kha","Trần Lê Quốc Khang","Lê Đoàn Anh Khoa","Nguyễn Thị Bảo Khuyên","Trần Thị Phương Linh","Nguyễn Bảo Luân","Lương Xuân My","Đặng Trần Thảo Nguyên","Trần Thái Nguyên","Võ Hoàng Nguyên","Nguyễn Thị Nguyệt","Nguyễn Trần Lâm Như","Đống Ngọc Hoài Oanh","Trần Ngọc Phi","Nguyễn Xuân Phúc","Nguyễn Thị Phượng","Đoàn Giang Sơn","Mai Văn Sỹ","Trần Thanh Tài","Đỗ Văn Thạch","Phạm Thị Bảo Thanh","Đinh Minh Thông","Trần Thị Trang","Trà Hoàng Bảo Trâm","Đinh Trần Ái Vi","Nguyễn Ngọc Thúy Vi","Bùi Tiến Vinh"];
+const $ = id => document.getElementById(id);
+const rnd = n => { const lim = Math.floor(0x100000000/n)*n, a = new Uint32Array(1); do { crypto.getRandomValues(a); } while (a[0] >= lim); return a[0] % n; };
+const fr = (a,b) => a + Math.random()*(b-a);
+const mod = (v,n) => ((v % n) + n) % n;
+const oq = t => 1-Math.pow(1-t,4), oc = t => 1-Math.pow(1-t,3), io = t => t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+
+const cv = $('w'), c = cv.getContext('2d'), S = 720, CX = 340, CY = 360, R = 315;
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+cv.width = S*dpr; cv.height = S*dpr; c.scale(dpr,dpr);
+let names = ALL.slice(), hist = [], s = 0, flap = 0, lastIdx = 0, tl = [], ti = 0, tt = 0, from = 0, running = false, winIdx = -1, doneT = -1, sel = 0;
+
+function draw(){
+  const N = names.length, a = 2*Math.PI/N, phi = s*a;
+  c.clearRect(0,0,S,S);
+  c.save(); c.shadowColor = 'rgba(0,0,0,.3)'; c.shadowBlur = 18; c.fillStyle = '#fff'; c.beginPath(); c.arc(CX,CY,R+8,0,7); c.fill(); c.restore();
+  for (let i = 0; i < N; i++){
+    const a0 = -(i+1)*a + phi, a1 = a0 + a, mid = (a0+a1)/2;
+    const hue = ALL.indexOf(names[i]) * 360/ALL.length;
+    c.fillStyle = `hsl(${hue},85%,${i%2?80:72}%)`;
+    c.beginPath(); c.moveTo(CX,CY); c.arc(CX,CY,R,a0,a1); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2; c.stroke();
+    c.save(); c.translate(CX,CY); c.rotate(mid); c.fillStyle = '#1a1a1a';
+    c.font = `800 ${Math.min(36,Math.max(26,Math.floor(920/N)))}px "Segoe UI",Arial,sans-serif`;
+    c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText(names[i], R-12, 0, R-64); c.restore();
+  }
+  if (doneT >= 0 && winIdx >= 0){
+    const i = winIdx, a0 = -(i+1)*a + phi;
+    c.save(); c.strokeStyle = '#fff'; c.lineWidth = 5; c.shadowColor = '#fde047'; c.shadowBlur = 20+10*Math.sin(doneT*6);
+    c.beginPath(); c.moveTo(CX,CY); c.arc(CX,CY,R,a0,a0+a); c.closePath(); c.stroke(); c.restore();
+  }
+  const FF = '"Segoe UI",Arial,sans-serif';
+  c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 10;
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(CX,CY,50,0,7); c.fill(); c.restore();
+  c.fillStyle = running ? '#a8a29e' : '#ea580c'; c.beginPath(); c.arc(CX,CY,41,0,7); c.fill();
+  c.fillStyle = '#fff'; c.font = '800 17px ' + FF; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('QUAY',CX,CY);
+  if (doneT >= 0 && winIdx >= 0){
+    const nm = names[winIdx], k = Math.min(1, doneT/.55), sc = 1 + 2.70158*Math.pow(k-1,3) + 1.70158*Math.pow(k-1,2), W = 580, H = 230;
+    c.save(); c.translate(CX,CY); c.scale(sc,sc); c.globalAlpha = Math.min(1,k*2);
+    c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 24; c.fillStyle = '#fffbeb'; c.strokeStyle = '#ea580c'; c.lineWidth = 8;
+    c.beginPath(); c.roundRect(-W/2,-H/2,W,H,24); c.fill(); c.shadowColor = 'transparent'; c.stroke();
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = '#c2410c'; c.font = '800 28px ' + FF; c.fillText('🎉 NGƯỜI MAY MẮN 🎉',0,-86);
+    let fs = 120; c.font = `800 ${fs}px ` + FF;
+    while (c.measureText(nm).width > W-36 && fs > 20){ fs -= 2; c.font = `800 ${fs}px ` + FF; }
+    c.fillStyle = '#1c1917'; c.fillText(nm,0,6);
+    c.fillStyle = '#78716c'; c.font = '600 20px ' + FF; c.fillText('Bấm để quay tiếp',0,92);
+    c.restore();
+  }
+  // mũi tên chỉ
+  c.save(); c.translate(CX+R+8, CY); c.rotate(Math.PI/2 + flap*0.45);
+  c.fillStyle = '#dc2626'; c.strokeStyle = '#fff'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(0,40); c.lineTo(-18,-10); c.quadraticCurveTo(0,-26,18,-10); c.closePath(); c.stroke(); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(0,-6,5,0,7); c.fill(); c.restore();
+}
+
+function plan(){
+  const N = names.length, W = rnd(N), kind = N < 4 ? 0 : rnd(5), j = fr(.2,.8), j2 = fr(.2,.8);
+  const s0 = mod(s,N), lap = (5+rnd(3))*N;
+  const absFor = (idx,jit) => { const v = s0 + lap; return v + mod(idx + jit - mod(v,N), N); };
+  const slow = {d:fr(9.5,12),e:oq};
+  let items;
+  if (kind === 0){ items = [{...slow,to:absFor(W,j)}]; }
+  else if (kind === 1){ // dừng ở tên khác, im lặng rồi quay vọt qua tên khác
+    const d = 5 + rnd(8), X = mod(W-d,N), b = absFor(X,j);
+    items = [{...slow,to:b},{p:1.4},{d:2.2,e:oc,to:b+d+(j2-j)+N}];
+  } else if (kind === 2){ // quay vọt qua rồi quay ngược về tên ban đầu
+    const d = 4 + rnd(6), b = absFor(W,j);
+    items = [{...slow,to:b},{p:1.2},{d:1,e:oc,to:b+d},{p:1.3},{d:2.4,e:io,to:b+(j2-j)}];
+  } else if (kind === 3){ // dừng rồi nhích sang tên kế tiếp
+    const X = mod(W-1,N), b = absFor(X,j);
+    items = [{...slow,to:b},{p:1.6},{d:1.2,e:io,to:b+1+(j2-j)}];
+  } else { // nhích hai lần liên tiếp, tưởng dừng rồi lại nhích tiếp
+    const X = mod(W-2,N), b = absFor(X,j);
+    items = [{...slow,to:b},{p:1.3},{d:1,e:io,to:b+1},{p:1.5},{d:1.2,e:io,to:b+2+(j2-j)}];
+  }
+  return {W,items};
+}
+function spin(){
+  if (running) return;
+  const p = plan(); tl = p.items; ti = 0; tt = 0; from = mod(s,names.length); s = from;
+  running = true; winIdx = -1; doneT = -1; $('reset').disabled = true;
+  $('rl').textContent = 'Đang quay...'; $('rn').textContent = '...'; $('rn').className = 'n'; window._W = p.W;
+}
+function step(dt){
+  if (doneT >= 0) doneT += dt;
+  flap = Math.max(0, flap - dt*7);
+  if (!running) return;
+  const it = tl[ti]; tt += dt;
+  if (it.p){ if (tt >= it.p){ ti++; tt = 0; } }
+  else {
+    const k = Math.min(1, tt/it.d); s = from + (it.to-from)*it.e(k);
+    if (k >= 1){ from = it.to; ti++; tt = 0; }
+  }
+  const N = names.length, idx = Math.floor(mod(s,N));
+  if (idx !== lastIdx){ flap = 1; lastIdx = idx; $('live').textContent = 'Mũi tên đang chỉ: ' + names[idx]; }
+  if (ti >= tl.length){ running = false; finish(Math.floor(mod(s,N))); }
+}
+function finish(idx){
+  const name = names[idx]; winIdx = idx; doneT = 0; sel = idx;
+  $('live').textContent = ''; $('rl').textContent = '🎉 Người may mắn là'; $('rn').textContent = name; $('rn').className = 'n pop';
+  hist.push(name); $('hist').innerHTML = hist.map((n,i)=>`<span class="tag">${i+1}. ${n}</span>`).join('');
+  boom(); $('reset').disabled = false;
+  if ($('rm').checked && names.length > 1){
+    setTimeout(()=>{ if (running) return; names.splice(idx,1); winIdx = -1; doneT = -1; s = mod(s,names.length); lastIdx = Math.floor(s); }, 2200);
+  }
+}
+function inHit(e){
+  const r = cv.getBoundingClientRect(), dx = (e.clientX-r.left)*S/r.width - CX, dy = (e.clientY-r.top)*S/r.height - CY;
+  return Math.hypot(dx,dy) <= 50 || (doneT >= 0 && Math.abs(dx) <= 290 && Math.abs(dy) <= 115);
+}
+cv.addEventListener('click', e => { if (inHit(e)) spin(); });
+cv.addEventListener('mousemove', e => { cv.style.cursor = (!running && inHit(e)) ? 'pointer' : 'default'; });
+$('reset').onclick = () => { if (running) return; names = ALL.slice(); hist = []; s = 0; winIdx = -1; doneT = -1; $('hist').innerHTML = '<span style="color:var(--muted)">Chưa có ai.</span>'; $('rl').textContent = 'Hãy bấm QUAY ở giữa vòng quay'; $('rn').textContent = '?'; $('rn').className = 'n'; $('live').textContent = ''; };
+
+const cf = $('cf'), cx = cf.getContext('2d');
+function boom(){
+  cf.width = innerWidth; cf.height = innerHeight;
+  const cols = ['#ea580c','#f59e0b','#10b981','#3b82f6','#ec4899','#facc15'];
+  const ps = Array.from({length:130},()=>({x:innerWidth/2,y:innerHeight/2.5,vx:(Math.random()-.5)*16,vy:Math.random()*-13-2,s:4+Math.random()*6,c:cols[rnd(cols.length)],r:Math.random()*6}));
+  let f = 0;
+  (function loop(){
+    cx.clearRect(0,0,cf.width,cf.height);
+    ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.3;p.r+=.2;cx.fillStyle=p.c;cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);cx.restore();});
+    if (++f < 110) requestAnimationFrame(loop); else cx.clearRect(0,0,cf.width,cf.height);
+  })();
+}
+let last = performance.now();
+(function loop(now){ const dt = Math.min(.05,(now-last)/1000); last = now; step(dt); draw(); requestAnimationFrame(loop); })(last);
+</script>
+</body>
+</html>
