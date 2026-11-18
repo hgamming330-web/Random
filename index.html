@@ -104,8 +104,11 @@ function draw(){
   c.fillStyle = '#fff'; c.beginPath(); c.arc(0,-6,5,0,7); c.fill(); c.restore();
 }
 
+// 6 kiểu kết thúc, mỗi kiểu xuất hiện với xác suất bằng nhau (100/6 %): 0 dừng thẳng, 1 quay vọt sang tên khác, 2 vọt qua rồi quay ngược, 3 nhích tới 1 tên, 4 nhích tới 2 lần, 5 lùi lại 1 tên
+const KINDS = 6;
+function pick(){ return rnd(KINDS); }
 function plan(){
-  const N = names.length, W = rnd(N), kind = N < 4 ? 0 : rnd(5), j = fr(.2,.8), j2 = fr(.2,.8);
+  const N = names.length, W = rnd(N), kind = N < 4 ? 0 : pick(), j = fr(.2,.8), j2 = fr(.2,.8);
   const s0 = mod(s,N), lap = (5+rnd(3))*N;
   const absFor = (idx,jit) => { const v = s0 + lap; return v + mod(idx + jit - mod(v,N), N); };
   const slow = {d:fr(9.5,12),e:oq};
@@ -120,9 +123,12 @@ function plan(){
   } else if (kind === 3){ // dừng rồi nhích sang tên kế tiếp
     const X = mod(W-1,N), b = absFor(X,j);
     items = [{...slow,to:b},{p:1.6},{d:1.2,e:io,to:b+1+(j2-j)}];
-  } else { // nhích hai lần liên tiếp, tưởng dừng rồi lại nhích tiếp
+  } else if (kind === 4){ // nhích hai lần liên tiếp, tưởng dừng rồi lại nhích tiếp
     const X = mod(W-2,N), b = absFor(X,j);
     items = [{...slow,to:b},{p:1.3},{d:1,e:io,to:b+1},{p:1.5},{d:1.2,e:io,to:b+2+(j2-j)}];
+  } else { // dừng ở tên kế tiếp rồi lùi lại 1 tên
+    const X = mod(W+1,N), b = absFor(X,j);
+    items = [{...slow,to:b},{p:1.6},{d:1.2,e:io,to:b-1+(j2-j)}];
   }
   return {W,items};
 }
